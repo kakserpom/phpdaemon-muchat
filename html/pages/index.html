@@ -1,0 +1,45 @@
+<div id="messages"></div>
+<div id="userlist"></div>
+<br class="clearfloat" /><br />
+<form action="#" id="inputForm" style="display: none">
+<input type="text" size="70" name="text" autocomplete="off" id="inputMessage" />
+<select name="color">
+<option value="black">Black</option>
+<option value="red">Red</option>
+<option value="green">Green</option>
+<option value="blue">Blue</option>
+</select>
+<input type="submit" value="Send" /> (<span class="yourusername"></span>) - listed on tags - <span class="yourtags"></span><br />
+<br />/nick Nickname&nbsp;&nbsp;&nbsp;/me slaps you...&nbsp;&nbsp;&nbsp;/thetime&nbsp;&nbsp;&nbsp;/tags<br />
+</form>
+<form action="#" id="loginForm" style="display: none">
+Enter your nickname: <input type="text" size="70" name="username" id="inputUsername" />
+<input type="submit" value="Log in" /><br />
+</form>
+Sent/Recieved data: <span class="sentDataCounter">~</span>/<span class="recvDataCounter">~</span>
+<script type="text/javascript">
+if ($.chat.username != null) {$('#inputMessage').show();}
+else {$('#loginForm').show();}
+if ($.chat.loaded == true)
+{
+ $.chat.initInputForm();
+ $.chat.initLoginForm();
+ $.chat.lastTS = 0;
+ $.chat.getHistory();
+ $.chat.getUserlist();
+ $.chat.setForms();
+}
+else
+{
+ $(document).ready(function()
+ {
+  if (!$.chat.loaded)
+  {
+   $.chat.loaded = true;
+   $.chat.initInputForm();
+   $.chat.initLoginForm();
+   $.chat.initConnect();
+  }
+ });
+}
+</script>
