@@ -1,21 +1,52 @@
+
+
 WebSocket = function(url, protocol, proxyHost, proxyPort, headers) {
 
      var self = this;
-     var connection, _ID, _TIME = 0;
+     var reader, _ID;
+     var _TIME = 0;
+     var container, interval;
      var autoId = 1;
 
-    this.readyState     = 3;
+    this.readyState     = 0;
     this.bufferedAmount = 0;
 
     this.onmessage = function(e){};
     this.onopen = function(){};
     this.onclose = function(){};
 
+
+    if (!window.console) console = {log: function(){ }, error: function(){ }};
+
+    
+    var readerIframe = document.createElement('iframe');
+	    with (readerIframe.style) {
+	      left       = top   = "-100px";
+	      height     = width = "1px";
+	      visibility = "hidden";
+	      position   = 'absolute';
+	      display    = 'none';
+	    }
+	    document.body.appendChild(readerIframe);
+	 var readerIframeWindow;
+	    if(readerIframe.window){
+	    	readerIframeWindow = readerIframe.window;
+	      }else if(readerIframe.contentWindow){
+	    	  readerIframeWindow = readerIframe.contentWindow;
+	      }	    
+	    readerIframeWindow.document.write("<html><body></body></html>");
+	    container = readerIframeWindow.document.body;
+	    
+	    
     /**
      * Send packet to server
      */
     this.send = function(data) {
+    	
+     
       if(!_ID)return;
+      
+      console.log('[WebSocket] send: ' + data);
       
       var iframe = document.createElement('iframe');
       var name = 'WebSocket_iframe_write' + autoId++;
@@ -31,20 +62,26 @@ WebSocket = function(url, protocol, proxyHost, proxyPort, headers) {
       document.body.appendChild(iframe);
            
       var form = document.createElement('form');
-      form.action = url;
-      form.method = 'POST';
+	      form.action = url;
+	      form.method = 'POST';
       
       var message = document.createElement('input');
-      message.type = 'text';
-      message.value = data; 
-      message.name  = 'data';
-      form.appendChild(message);
+	      message.type = 'hidden';
+	      message.value = data; 
+	      message.name  = 'data';
+	      form.appendChild(message);
       
       var id = document.createElement('input');
-      id.type = 'text';
-      id.value = _ID; 
-      id.name  = '_id';
-      form.appendChild(id);
+	      id.type = 'hidden';
+	      id.value = _ID; 
+	      id.name  = '_id';
+	      form.appendChild(id);
+	      
+	  var poll = document.createElement('input');
+		  poll.type = 'hidden';
+		  poll.value = 1; 
+		  poll.name  = '_poll';
+	      form.appendChild(poll);
       
       if(iframe.window){
     	  iframe.window.document.write("<html><body></body></html>");
@@ -61,20 +98,28 @@ WebSocket = function(url, protocol, proxyHost, proxyPort, headers) {
     };
 
 
+
+
+
+
+
+
     /**
      * Close connection
      */
     this.close = function(){
-    	if(connection){
+    
+    	if(reader){
           this.readyState = 2;
-          document.body.removeChild(connection);
-          connection = false;
+          clear(); 
           this.readyState = 3;
           this.onclose();
     	}
         
     };
 
+    
+    
 
     /*
     Кодирование данных (простого ассоциативного массива вида { name : value, ...} в
@@ -93,6 +138,9 @@ WebSocket = function(url, protocol, proxyHost, proxyPort, headers) {
     };
 
 
+    
+    
+    
 
       /*
       Создание XMLHttpRequest-объекта
@@ -119,38 +167,70 @@ WebSocket = function(url, protocol, proxyHost, proxyPort, headers) {
       
       
       
+      
+      
+     var clear = function(){
+    	 
+    	 if(interval){
+    		 clearInterval(interval); 
+    	 }
+    	 
+    	 if(reader){
+    		 container.removeChild(reader);
+			 reader = false;    		 
+    	 }
+    	 
+     };
+      
+      
       /*
        * Send request to server
        */
       var $q = function(callback) {
-
+      
            	var qid = Math.random().toString();
            	qid = qid.substr(3,5);
            	var respname = 'Response'+qid;
-           	var reader = document.createElement('script');
+           	var loaded = false;               	
+           	    if(reader){
+           	    	container.removeChild(reader);
+           	    	reader = false;
+           	    }
+           	    reader = document.createElement('script');
            	    reader.setAttribute('charset',     'utf-8');           	     
            	    reader.setAttribute('src', url+'&_script=1&_poll=1'+(!_ID ? '&_init=1' : '&_id='+_ID)+'&q='+qid+'&ts='+_TIME);
-           	var c = document.head || document.body;
-                c.appendChild(reader);
+           	    reader.onload = function(){loaded = true;};
+           	    
+           	   container.appendChild(reader);
+                
                if (callback) {
                var __TIMER = 0;
-               var __INTERVAL = 50;
-               var interval = setInterval(function() {
-           				if (eval("typeof " + respname) != 'undefined') {
-           				var response = eval(respname);
-                           clearInterval(interval);
-           				callback(response);
-           				c.removeChild(reader);
-           				
-           			    }else if(__TIMER >= 15000){
-           			     clearInterval(interval);
-           			      $q(resp);
+               var __INTERVAL = 10;
+               var __WAIT_TIME = 10000;
+               interval = setInterval(function() {
+            	
+           				if (typeof(readerIframeWindow[respname]) != 'undefined') {
+           					clear();           					
+           					console.log('[WebSocket] received: ' + respname);
+           				    var response = readerIframeWindow[respname];                            
+	           				callback(response);
+	           				$q(resp);
+           			    }else if(__TIMER >= __WAIT_TIME){            			    
+           			       clear();            			      
+           			       $q(resp);
+           			    }else if(loaded){            			    	
+           			    	self.close();
+           			    	
            			    }
+
            				__TIMER += __INTERVAL;
            		}, __INTERVAL);
            	}
 
        };
+     
+       
+       
        
            
    
@@ -158,24 +238,27 @@ WebSocket = function(url, protocol, proxyHost, proxyPort, headers) {
       * Server Response
       */
      var resp = function(response){
-     	
+    	
      	if(!response)alert('Error packet');
       
      	 if(!_ID){
      		_ID = response.id; 
      		 self.readyState = 1;
              self.onopen();
-     	 }else{
      		
+     	 }else{
+     	
      		  for(var i = 0; i< response.packets.length; i++){
                    var msg = {data : response.packets[i][1]};
                    _TIME = response.packets[i][2];
                    self.onmessage(msg);
                   }
      		 
-     	 }
-     	$q(resp);
+     	 }     	
      };
+
+
+     
 
      var  init = function() {
 
@@ -185,5 +268,6 @@ WebSocket = function(url, protocol, proxyHost, proxyPort, headers) {
     };
 
     init();
-};
+ };
+
 WebSocketServicePrivider = 'polling';

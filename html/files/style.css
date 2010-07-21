@@ -1,35 +1,6 @@
 * {margin: 0; padding: 0;}
-.ullink a {text-decoration: none;}
-.ullink a:hover {text-decoration: underline;}
-legend {font-size: 15px;}
-oldbody  {font-size: 11px; font-family: Arial, Helvetica, sans-serif, "Arial Narrow", serif; color: #000000;}
 img {border: none;}
 .clearfloat {clear: both; height: 0; font-size: 1px; line-height: 0px;}
-ul {list-style: none;}
-.ullist {list-style: disc; margin-left: 25px;}
-.ullist a {text-decoration: none;}
-.ullist a:hover {text-decoration: underline;}
-fieldset
-{
- border: 2px groove threedface;
- padding: 0.35em 0.625em 0.75em;
-}
-legend
-{
- font: 13px Verdana,Arial,sans-serif;
- font-family : Verdana, Arial, sans-serif;
- line-height: 1.5em;
- padding-left: 2px;
- padding-right: 2px;
- border-collapse:separate;
- border-spacing:2px;
- text-indent:0;
-}
-.table_simple {BORDER-COLLAPSE: collapse; border-ColorDark: #646464; border-ColorLight: #646464;}
-.table_simple td,tr {padding: 5px;}
-.table_simple td,tr {padding: 5px; font-size: 1em; font-family: Verdana,Helvetica,sans-serif;}
-.table_simple h3 {padding: 5px; font-size: 0.9em; font-family: Verdana,Helvetica,sans-serif;}
-.bquote {background-color:#F0F0F0; padding: 1em; margin-top: 10px; margin-bottom: 10px;}
 a {color: #000000;}
 /*center*/
 .center {width: 990px; margin: 0px auto;}
@@ -43,12 +14,15 @@ a {color: #000000;}
 #content
 {
  font-family: Verdana,Helvetica,sans-serif;
- font-size: 0.8em;
+ font-size: 1em;
  line-height: 1.4em;
  margin-left: auto; margin-right: auto; width: 1000px;
  margin-top: 8px;
 }
-
+input
+{
+ padding: 5px;
+}
 #nav-wrap {margin: 0; text-align: left; padding-top: 2px; border-bottom: 1px dashed #ccc;}
 #nav
 {
@@ -127,39 +101,6 @@ a {color: #000000;}
 #signinForm span
 {
  float: left;
-}
-
-
-#settingsForm label, #settingsFieldset label
-{
- float: left;
- width: 300px;
-}
-#settingsFieldset span
-{
- float: left;
- text-align: center;
-}
-.term {text-decoration: none; border-bottom:1px dashed #000000;}
-#searchResults table
-{
- border: 1px groove threedface;
- border-spacing: 5px;
- border-collapse: collapse;
-}
-#searchResults td
-{
- border: 1px groove threedface;
- border-spacing: 5px;
- padding: 5px;
-}
-#searchResults .head
-{
- font-weight: bold;
-}
-.searchResult
-{
- margin-top: 5px;
 }
 #messages
 {

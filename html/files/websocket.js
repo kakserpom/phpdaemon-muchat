@@ -1,4 +1,5 @@
-﻿/**
+﻿if (typeof (console) == 'undefined') {console = {log: function(msg) {}};}
+/**
    params = {
               url   : {
                         ws      : '',
@@ -12,11 +13,10 @@
 WebSocketConnection = function(params){
 
     var self = this;
-
     /**
      * Путь к js и swf файлам
      */
-    this.root = '/files/';
+    this.root = params.root || '/js/';
     
 
 
@@ -30,8 +30,9 @@ WebSocketConnection = function(params){
     /**
      * Статус WebSocket соединения
      */
-    this.readyState     = 3;
+    this.readyState     = 0;
     this.bufferedAmount = 0;
+    this.readyCallbacks = [];
 
 
 
@@ -39,6 +40,15 @@ WebSocketConnection = function(params){
      * Закрытие соединения с сервером
      */
     this.close = function(){if(WS)WS.close();};
+    
+    this.ready = function(c)
+    {
+     if (self.readyState == 1) {c();}
+     else
+     {
+      self.readyCallbacks.push(c);
+     }
+    };
 
 
 
@@ -55,10 +65,20 @@ WebSocketConnection = function(params){
     var onmessageEvent = function(e){if(self.onmessage)self.onmessage(e);};
 
     // соединение с сервером установлено
-    var onopenEvent = function(){if(self.onopen)self.onopen();};
+    var onopenEvent = function()
+    {
+     self.readyState = 1;
+     if(self.onopen)self.onopen();
+     var c;
+     while (c = self.readyCallbacks.pop()) {c();}
+    };
 
     // соединение с сервером закрыто
-    var oncloseEvent = function(){if(self.onclose)self.onclose();};
+    var oncloseEvent = function()
+    {
+     self.readyState = 3;
+     if(self.onclose)self.onclose();
+    };
 
 
 
@@ -148,7 +168,7 @@ WebSocketConnection = function(params){
            if(!loaded){
              onError();
            }
-    }
+    };
 
 
 
@@ -163,7 +183,7 @@ WebSocketConnection = function(params){
           return true;
          }
 
-          var x, flashinstalled = 0;
+               var x, flashinstalled = 0;
                var MSDetect = false;
 
             if (navigator.plugins && navigator.plugins.length){
@@ -174,7 +194,7 @@ WebSocketConnection = function(params){
                     flashinstalled = 1;
                 }
 
-                if (navigator.plugins["Shockwave Flash 9.0"] || navigator.plugins["Shockwave Flash 10.0"]){
+                if (navigator.plugins["Shockwave Flash 9.0"] || navigator.plugins["Shockwave Flash 10.0"] || navigator.plugins["Shockwave Flash 10.1"]){
                     flashinstalled = 2;
                 }
 
@@ -185,10 +205,13 @@ WebSocketConnection = function(params){
                     flashinstalled = 2;
                 else
                     flashinstalled = 1;
-            }else
-                MSDetect = true;
-
-
+            }else{           	
+            	MSDetect = true;
+            }
+                
+            console.log(navigator.plugins);
+            console.log(navigator.mimeTypes);
+         
             if(flashinstalled != 2 && MSDetect == true){
                var iframe = document.createElement('iframe');
                  with (iframe.style) {
@@ -204,28 +227,31 @@ WebSocketConnection = function(params){
                  }else if(iframe.window){
                    win = iframe.window;
                  }
-
+             
                  if(win){
                    win.flashinstalled = 0;
-                   win.document.write("<html><body>");
-                   win.document.write('<script LANGUAGE="VBScript">');
-                   win.document.write('on error resume next');
-                   win.document.write('For i = 1 to 11');
-                   win.document.write('If Not(IsObject(CreateObject("ShockwaveFlash.ShockwaveFlash." & i))) Then');
-                   win.document.write('Else');
-                   win.document.write('flashinstalled = 2');
-                   win.document.write('End If');
-                   win.document.write('Next');
-                   win.document.write('If flashinstalled = 0 Then');
-                   win.document.write('flashinstalled = 1');
-                   win.document.write('End If');
-                   win.document.write('End If');
-                   win.document.write('</script>');
-                   win.document.write("</body></html>");
+                   win.document.writeln("<html><body>");
+                   win.document.writeln('<script LANGUAGE="VBScript">');
+                   win.document.writeln('on error resume next');
+                   win.document.writeln('For i = 1 to 11');
+                   win.document.writeln('If Not(IsObject(CreateObject("ShockwaveFlash.ShockwaveFlash." & i))) Then');
+                   win.document.writeln('Else');
+                   win.document.writeln('flashinstalled2 = 2');
+                   win.document.writeln('End If');
+                   win.document.writeln('Next');
+                   win.document.writeln('If flashinstalled2 = 0 Then');
+                   win.document.writeln('flashinstalled2 = 1');
+                   win.document.writeln('End If');
+                   win.document.writeln('</script>');
+                   win.document.writeln('<script type="text/javascript">');
+                   win.document.writeln('flashinstalled = flashinstalled2');
+                   win.document.writeln('</script>');
+                   win.document.writeln("</body></html>");
                    flashinstalled = win.flashinstalled;
+                  
                  }
             }
-
+            
               if(flashinstalled == 2){
                loadEmulator('flash', function(){
                   createSocket(params.url.ws);
@@ -233,7 +259,7 @@ WebSocketConnection = function(params){
                return true;
               }
          return false;
-    }
+    };
 
 
 
@@ -253,7 +279,7 @@ WebSocketConnection = function(params){
          }
 
          return true;
-    }
+    };
 
 
 
@@ -271,7 +297,7 @@ WebSocketConnection = function(params){
            });
          }
          return true;
-    }
+    };
 
 
 
@@ -285,7 +311,7 @@ WebSocketConnection = function(params){
               WS.onopen    = onopenEvent;
               WS.onmessage = onmessageEvent;
               WS.onclose   = oncloseEvent;
-    }
+    };
 
 
 

@@ -248,16 +248,15 @@ $.chat =
    if ($.chat.ws.readyState != 2) {return;}
    else
    {
-    $.chat.addMsg({"text": "* Пытаюсь переподключиться...", "color": "gray", "mtype": "system"});
+    $.chat.addMsg({"text": "* Trying to reconnect...", "color": "gray", "mtype": "system"});
    }
   }
-  $.chat.addMsg({"text": "* Идёт подключение...", "color": "gray", "mtype": "system"});
+  $.chat.addMsg({"text": "* Connecting...", "color": "gray", "mtype": "system"});
   //$.chat.ws = new WebSocket($.chat.serverUrl.ws);
-  $.chat.ws = new WebSocketConnection({url: $.chat.serverUrl});
-  $.chat.ws.root = '/files/';
+  $.chat.ws = new WebSocketConnection({url: $.chat.serverUrl,root:'files/'});
   $.chat.ws.onopen = function()
   {
-   $.chat.addMsg({"text": "* Подключение прошло успешно.", "color": "gray", "mtype": "system"});
+   $.chat.addMsg({"text": "* Connected.", "color": "gray", "mtype": "system"});
    if ($.chat.username != null) {$.chat.setUsername($.chat.username);}
    $.chat.setTags($.chat.tagsDefault);
    $.chat.getHistory();
@@ -344,7 +343,7 @@ $.chat =
   };
   $.chat.ws.onclose = function()
   {
-   $.chat.addMsg({"text": "* Упс! Произошло отключение от сервера!", "color": "gray", "mtype": "system"});
+   $.chat.addMsg({"text": "* Oops! Disconnected from server.", "color": "gray", "mtype": "system"});
   };
  }
 };
@@ -379,11 +378,11 @@ $(document).ready(function()
                 selection.removeClass(defaultClass).addClass(activeClass);
                 $.address.title($.address.title().split(' | ')[0] + ' | ' + selection.text());
                 if (event.path === '/') {event.path = '/index';}
-                $('#content').load('/pages'+event.path+'.html',null,function (responseText, textStatus, XMLHttpRequest)
+                $('#content').load('pages'+event.path+'.html',null,function (responseText, textStatus, XMLHttpRequest)
                 {
                  if (textStatus == 'error')
                  {
-                  $('#content').html('Упс! Произошла ошибка. Проверьте Ваше подключение.');
+                  $('#content').html('Oops! Error occured. Check your connection.');
                  }
                 });
             });
