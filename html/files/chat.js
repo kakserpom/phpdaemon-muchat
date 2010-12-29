@@ -245,7 +245,7 @@ $.chat =
  {
   if ($.chat.ws != null)
   {
-   if ($.chat.ws.readyState != 2) {return;}
+   if ($.chat.ws.readyState != WebSocket.CLOSED) {return;}
    else
    {
     $.chat.addMsg({"text": "* Trying to reconnect...", "color": "gray", "mtype": "system"});
