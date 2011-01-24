@@ -5,7 +5,6 @@ DRAFT:
  db.chatsessions.ensureIndex({id:1},{unique: true});
  db.createCollection("chatevents", {capped:true, size:100000})
 */
-return new Chat;
 class Chat extends AppInstance
 {
  public $sessions = array();
@@ -13,18 +12,20 @@ class Chat extends AppInstance
  public $db;
  public $tags;
  public $minMsgInterval;
+ protected function getConfigDefaults()
+ {
+  return array(
+   'dbname' => 'chat',
+   'adminpassword' => '',
+   'enable' => 0
+  );
+ }
  public function init()
  {
-  Daemon::addDefaultSettings(array(
-   'mod'.$this->modname.'dbname' => 'chat',
-   'mod'.$this->modname.'adminpassword' => '',
-   'mod'.$this->modname.'enable' => 0
-  ));
-  if (Daemon::$settings['mod'.$this->modname.'enable'])
+  if ($this->config->enable->value)
   {
    Daemon::log(__CLASS__.' up.');
    $this->db = Daemon::$appResolver->getInstanceByAppName('MongoClient');
-   $this->dbname = &Daemon::$settings[$k = 'mod'.$this->modname.'dbname'];
    $this->tags = array();
    $this->minMsgInterval = 1;
   }
@@ -74,19 +75,19 @@ class Chat extends AppInstance
  {
   if (!isset($doc['ts'])) {$doc['ts'] = microtime(TRUE);}
   if (!isset($doc['tags'])) {$doc['tags'] = array();}
-  $this->db->{$this->dbname.'.chatevents'}->insert($doc);
+  $this->db->{$this->config->dbname->value.'.chatevents'}->insert($doc);
  }
  public function onHandshake($client) {return $this->sessions[$client->connId] = new ChatSession($client,$this);}
  public function onReady()
  {
-  if (Daemon::$settings['mod'.$this->modname.'enable'])
+  if ($this->config->enable->value)
   {
    $this->WS = Daemon::$appResolver->getInstanceByAppName('WebSocketServer');
    if ($this->WS)
    {
     $this->WS->routes['Chat'] = array($this,'onHandshake');
    }
-   $this->pushRequest(new Chat_MsgQueueRequest($this,$this));
+   new Chat_MsgQueueRequest($this,$this);
   }
  }
 }
@@ -113,7 +114,7 @@ class ChatTag
   if (!$this->cursor)
   {
    $tag = $this;
-   $this->appInstance->db->{$this->appInstance->dbname.'.chatevents'}->find(function($cursor) use ($tag)
+   $this->appInstance->db->{$this->appInstance->config->dbname->value.'.chatevents'}->find(function($cursor) use ($tag)
    {
     $tag->cursor = $cursor;
     foreach ($cursor->items as $k => &$item)
@@ -216,7 +217,7 @@ class ChatSession
  public function onFinish()
  {
   $this->setTags(array());
-  $this->appInstance->db->{$this->appInstance->dbname.'.chatsessions'}->remove(array('id' => $this->sid));
+  $this->appInstance->db->{$this->appInstance->config->dbname->value.'.chatsessions'}->remove(array('id' => $this->sid));
   unset($this->appInstance->sessions[$this->client->connId]);
  }
  public function onAddedTags($tags,$silence = FALSE)
@@ -308,7 +309,7 @@ class ChatSession
  public function updateSession($a)
  {
   $a['id'] = $this->sid;
-  $this->appInstance->db->{$this->appInstance->dbname.'.chatsessions'}->upsert(
+  $this->appInstance->db->{$this->appInstance->config->dbname->value.'.chatsessions'}->upsert(
    array('id' => $this->sid),
    array('$set' => $a)
   );
@@ -356,7 +357,7 @@ class ChatSession
   if ($this->username === $name) {return 3;}
   $clientId = $this->client->connId;
   $appInstance = $this->appInstance;
-  $this->appInstance->db->{$this->appInstance->dbname.'.chatsessions'}->findOne(function($item) use ($clientId, $appInstance, $name, $silence)
+  $this->appInstance->db->{$this->appInstance->config->dbname->value.'.chatsessions'}->findOne(function($item) use ($clientId, $appInstance, $name, $silence)
   {
    if (!isset($appInstance->sessions[$clientId])) {return;}
    $session = $appInstance->sessions[$clientId];
@@ -439,7 +440,7 @@ class ChatSession
    $condts = array('$lt' => microtime(TRUE));
    $lastTS = isset($packet['lastTS'])?(float)$packet['lastTS']:0;
    if ($lastTS > 0) {$condts['$gt'] = $lastTS;}
-   $this->appInstance->db->{$this->appInstance->dbname.'.chatevents'}->find(function($cursor) use ($session)
+   $this->appInstance->db->{$this->appInstance->config->dbname->value.'.chatevents'}->find(function($cursor) use ($session)
    {
     $tag->cursor = $cursor;
     $cursor->items = array_reverse($cursor->items);
@@ -461,7 +462,7 @@ class ChatSession
   elseif ($cmd == 'getUserlist')
   {
    $session = $this;
-   $this->appInstance->db->{$this->appInstance->dbname.'.chatsessions'}->find(function($cursor) use ($session)
+   $this->appInstance->db->{$this->appInstance->config->dbname->value.'.chatsessions'}->find(function($cursor) use ($session)
    {
     $tag->cursor = $cursor;
     $cursor->items = array_reverse($cursor->items);
@@ -535,7 +536,7 @@ class ChatSession
     elseif ($m === 'su')
     {
      $password = $text;
-     if ($this->su || (($password !== '') && ($password === Daemon::$settings[$k = 'mod'.$this->appInstance->modname.'adminpassword'])))
+     if ($this->su || (($password !== '') && ($password === $this->appInstance->adminpassword->value)))
      {
       $this->su = TRUE;
       $this->sysMsg('* You\'ve got the power.');
@@ -611,7 +612,7 @@ class ChatSession
   if (!isset($doc['ts'])) {$doc['ts'] = microtime(TRUE);}
   if (!isset($doc['tags'])) {$doc['tags'] = $this->tags;}
   $doc['sid'] = $this->sid;
-  $this->appInstance->db->{$this->appInstance->dbname.'.chatevents'}->insert($doc);
+  $this->appInstance->db->{$this->appInstance->config->dbname->value.'.chatevents'}->insert($doc);
  }
  public function sysMsg($msg)
  {
