@@ -90,7 +90,7 @@ class Chat extends AppInstance
     }
     
     public function validateUsername($s) {
-        return preg_match('~^(?!@)[A-Za-z\-_!0-9\.\w&#1040;-&#1071;&#1072;-&#1103;]+$~u',$s);
+        return preg_match('~^(?!@)[A-Za-z\-_!0-9\.\wА-Яа-я]+$~u',$s);
     }
     
     public function broadcastEvent($doc)
@@ -646,7 +646,7 @@ class ChatSession
                 'text' => $text,
                 'color' => $color,
                 );
-                if (preg_match_all('~(?<=^|\s)@([A-Za-z\-_!0-9\.\w&#1040;-&#1071;&#1072;-&#1103;]+)~u',$text,$m)) {
+                if (preg_match_all('~(?<=^|\s)@([A-Za-z\-_!0-9\.\wА-Яа-я]+)~u',$text,$m)) {
                     $doc['to'] = $m[1];
                 }
                 $this->sendMessage($doc);
