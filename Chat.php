@@ -4,222 +4,189 @@ DRAFT:
  db.chatsessions.ensureIndex({id:1},{unique: true});
  db.createCollection("chatevents", {capped:true, size:100000})
 */
-	class Chat extends AppInstance {
-		public $sessions = array();
-		public $dbname;
-		public $db;
-		public $tags;
-		public $minMsgInterval;
-		public $sessCounter = 0;
-		protected
-		function getConfigDefaults() {
-			return array('dbname' => 'chat','adminpassword' => '','enable' => 0);
+class Chat extends AppInstance {
+	public $sessions = array();
+	public $dbname;
+	public $db;
+	public $tags;
+	public $minMsgInterval;
+	public $sessCounter = 0;
+	protected function getConfigDefaults() {
+		return array('dbname' => 'chat','adminpassword' => '','enable' => 0);
+	}
+
+	public function init() {
+		if ($this->config->enable->value) {
+			Daemon::log(__CLASS__.' up.');
+			$this->db = MongoClient::getInstance();
+			$this->tags = array();
+			$this->minMsgInterval = 1;
 		}
-
-		public
-		function init() {
-			
-			if ($this->config->enable->value) {
-				Daemon::log(__CLASS__.' up.');
-				$this->db = MongoClient::getInstance();
-				$this->tags = array();
-				$this->minMsgInterval = 1;
-			}
-
+	}
+	public function getTag($name) {
+		if (isset($this->tags[$name])) {
+			return $this->tags[$name];
 		}
-
-		public
-		function getTag($name) {
-			
-			if (isset($this->tags[$name])) {
-				return $this->tags[$name];
-			}
-
-			return $this->tags[$name] = new ChatTag($name,$this);
-		}
-
-		public
-		function kickUsers($users,$tags = '',$reason = '') {
-			$users = trim($users);
-			
-			if ($users === '') {
-				return FALSE;
-			}
-
-			$tags = trim($tags);
-			$this->broadcastEvent(array(      'type' => 'kickUsers',      'users' => explode(',',$users),      'tags' => ($tags !== '' ? explode(',', $tags) :
-			array('%all')),      'reason' => $reason,    ));
-			return TRUE;
-		}
-
-		public
-		function compareMask($username,$masks = array()) {
-			foreach ($masks as $mask) {
-				
-				if (fnmatch($mask,$username,FNM_CASEFOLD)) {
-					return TRUE;
-				}
-
-			}
-
+		return $this->tags[$name] = new ChatTag($name,$this);
+	}
+	public function kickUsers($users,$tags = '',$reason = '') {
+		$users = trim($users);
+		if ($users === '') {
 			return FALSE;
 		}
+		$tags = trim($tags);
+		$this->broadcastEvent(array(
+			'type' => 'kickUsers',
+			'users' => explode(',', $users),
+			'tags' => ($tags !== '' ? explode(',', $tags) : array('%all')), 
+			'reason' => $reason,
+		));
+		return TRUE;
+	}
 
-		public function forceChangeNick($name,$newname) {
-			$name = trim($name);
-			
-			if ($name === '') {
-				return FALSE;
+	public function compareMask($username,$masks = array()) {
+		foreach ($masks as $mask) {
+			if (fnmatch($mask, $username, FNM_CASEFOLD)) {
+				return TRUE;
 			}
-
-			$newname = trim($newname);
-			
-			if ($newname === '') {
-				return FALSE;
-			}
-
-			$this->broadcastEvent(array(
-				'type' => 'forceChangeNick',
-				'username' => $name,
-				'changeto' => $newname,
-				'tags' => '%all',
-			));
-			return TRUE;
 		}
-
-		public function validateUsername($s) {
-			return preg_match('~^(?!@)[A-Za-z\-_!0-9\.\wА-Яа-яёЁ]+$~u', $s);
+		return FALSE;
+	}
+	public function forceChangeNick($name,$newname) {
+		$name = trim($name);
+		if ($name === '') {
+			return FALSE;
 		}
-
-		public function broadcastEvent($doc) {
-			if (!isset($doc['ts'])) {
-				$doc['ts'] = microtime(TRUE);
-			}
-			
-			if (!isset($doc['tags'])) {
-				$doc['tags'] = array();
-			}
-
-			$this->db->{$this->config->dbname->value.'.chatevents'}->insert($doc);
+		$newname = trim($newname);
+		if ($newname === '') {
+			return FALSE;
 		}
+		$this->broadcastEvent(array(
+			'type' => 'forceChangeNick',
+			'username' => $name,
+			'changeto' => $newname,
+			'tags' => '%all',
+		));
+		return TRUE;
+	}
+	public function validateUsername($s) {
+		return preg_match('~^(?!@)[A-Za-z\-_!0-9\.\wА-Яа-яёЁ]+$~u', $s);
+	}
 
-		public function onHandshake($client) {
-			$client->id = ++$this->sessCounter;
-			return $this->sessions[$client->id] = new ChatSession($client,$this);
+	public function broadcastEvent($doc) {
+		if (!isset($doc['ts'])) {
+			$doc['ts'] = microtime(TRUE);
 		}
+		if (!isset($doc['tags'])) {
+			$doc['tags'] = array();
+		}
+		$this->db->{$this->config->dbname->value.'.chatevents'}->insert($doc);
+	}
 
-		public function onReady() {
-			if ($this->config->enable->value) {
-				WebSocketServer::getInstance()->addRoute('Chat', array($this,'onHandshake'));
-				new Chat_MsgQueueRequest($this,$this);
-			}
+	public function onHandshake($client) {
+		$client->id = ++$this->sessCounter;
+		return $this->sessions[$client->id] = new ChatSession($client,$this);
+	}
+	public function onReady() {
+		if ($this->isEnabled()) {
+			WebSocketServer::getInstance()->addRoute('Chat', array($this,'onHandshake'));
+			$app = $this;
+			$this->timer = setTimeout(function($timer) use ($app) {
+				foreach ($app->tags as $tag) {
+					$tag->touch();
+				}
+				$timer->timeout();
+			}, 0.3e6);
 		}
 	}
-	
-	class ChatAntifloodPlugin {
-		public function onMessage() {
+	public function onFinish() {
+		if ($this->timer) {
+			Timer::clearTimeout($this->timer);
+			$this->timer = null;
 		}
-
 	}
-	
-	class ChatTag {
-		public $appInstance;
-		public $sessions = array();
-		public $tag;
-		public $cursor;
-		public $counter = 0;
-		public function __construct($tag,$appInstance) {
-			$this->tag = $tag;
-			$this->appInstance = $appInstance;
-		}
-
-		public function touch() {
-			
-			if (!$this->cursor) {
-				$tag = $this;
-				$this->appInstance->db->{
-					$this->appInstance->config->dbname->value.'.chatevents'}
-
-				->find(
-				function($cursor) use ($tag) {
-					$tag->cursor = $cursor;
-					foreach ($cursor->items as $k => &$item) {
-						
-						if ($item['type'] === 'kickUsers') {
-							foreach ($tag->sessions as $id => $v) {
-								$sess = $tag->appInstance->sessions[$id];
-								
-								if (($sess->username !== NULL) && ($tag->appInstance->compareMask($sess->username,$item['users']))) {
-									$sess->removeTags(array($tag->tag),TRUE);
-									$sess->sysMsg('* You were kicked from #'.$tag->tag.'.'.($item['reason'] !== ''?' Reason: '.$item['reason']:
-									''));
-									$tag->appInstance->broadcastEvent(array(                  'type' => 'msg',                  'mtype' => 'system',                  'text' => ' * Kicked: '.$sess->username.($item['reason'] !== ''?', reason: '.$item['reason']:
-									''),                  'color' => 'green',                  'tags' => $tag->tag,                ));
+}	
+class ChatTag {
+	public $appInstance;
+	public $sessions = array();
+	public $tag;
+	public $cursor;
+	public $counter = 0;
+	public function __construct($tag,$appInstance) {
+		$this->tag = $tag;
+		$this->appInstance = $appInstance;
+	}
+	public function createCursor() {
+		$this->appInstance->db->{$this->appInstance->config->dbname->value . '.chatevents'}->find(function($cursor) use ($tag) {
+			$tag->cursor = $cursor;
+				foreach ($cursor->items as $k => &$item) {
+					if ($item['type'] === 'kickUsers') {
+						foreach ($tag->sessions as $id => $v) {
+							$sess = $tag->appInstance->sessions[$id];
+							if (($sess->username !== NULL) && ($tag->appInstance->compareMask($sess->username,$item['users']))) {
+								$sess->removeTags(array($tag->tag),TRUE);
+								$sess->sysMsg('* You were kicked from #' . $tag->tag . '.' . ($item['reason'] !== '' ? ' Reason: '.$item['reason'] : ''));
+									$tag->appInstance->broadcastEvent(array(
+										'type' => 'msg',
+										'mtype' => 'system',
+										'text' => ' * Kicked: '.$sess->username . ($item['reason'] !== '' ? ', reason: ' . $item['reason'] : ''),
+										'color' => 'green',
+										'tags' => $tag->tag,
+									));
 								}
-
 							}
-
 						}
-
 						elseif ($item['type'] === 'forceChangeNick') {
 							foreach ($tag->sessions as $id => $v) {
 								$sess = $tag->appInstance->sessions[$id];
-								
 								if (($sess->username !== null) && ($sess->username === $item['username'])) {
 									$sess->setUsername($item['changeto'], true);
 								}
-
 							}
-
-						} else {
+						}
+						else {
 							$item['_id'] = (string) $item['_id'];
-							
 							if (isset($item['sid'])) {
 								$item['sid'] = (string) $item['sid'];
 							}
-
 							$packet = ChatSession::serialize($item);
 							foreach ($tag->sessions as $id => $v) {
 								$s = $tag->appInstance->sessions[$id];
-								
 								if ($s->putMsgId($item['_id'])) {
 									$s->client->sendFrame($packet);
 								}
-
 							}
-
 						}
-
 						unset($cursor->items[$k]);
 					}
-
-					
 					if ($cursor->finished) {
 						$cursor->destroy();
 					}
-
 					// hook
-				}
-
-				, array(        'tailable' => TRUE,        'sort' => array('$natural' => 1),       'where' => array(         'ts' => array('$gt' => microtime(true)),         'tags' => array('$in' => array($this->tag,'%all'))       )    ));
-			}
-
+				}, array(
+					'tailable' => TRUE,
+					'sort' => array('$natural' => 1),
+					'where' => array(
+						'ts' => array('$gt' => microtime(true)),
+			'tags' => array('$in' => array($this->tag,'%all')
+			)
+		)));
+	}
+	public function touch() {
+		if (!$this->cursor) {
+			$tag = $this;
+			
+		}
 			elseif (!$this->cursor->conn->busy) {
 				try {
 					$this->cursor->getMore();
 				}
-
 				catch (MongoClientSessionFinished $e) {
 					$this->cursor = false;
 				}
-
 			}
-
 		}
-
 	}
-
-	
 	class ChatSession extends WebSocketRoute{
 		public $client;
 		public $username;
@@ -712,18 +679,6 @@ DRAFT:
 				'color' => 'green',
 				'ts' => microtime(TRUE),
 			));
-		}
-
-	}
-
-	
-	class Chat_MsgQueueRequest extends Request{
-		public function run() {
-			foreach ($this->appInstance->tags as $tag) {
-				$tag->touch();
-			}
-
-			$this->sleep(0.3);
 		}
 
 	}
