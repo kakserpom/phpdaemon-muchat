@@ -181,7 +181,7 @@ class ChatTag {
 			try {
 					$this->cursor->getMore();
 				}
-				catch (MongoClientSessionFinished $e) {
+				catch (MongoClientConnectionFinished $e) {
 					$this->cursor = false;
 				}
 			}
