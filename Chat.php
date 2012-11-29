@@ -117,6 +117,7 @@ class ChatTag {
 		$this->appInstance = $appInstance;
 	}
 	public function createCursor() {
+		$tag = $this;
 		$this->appInstance->db->{$this->appInstance->config->dbname->value . '.chatevents'}->find(function($cursor) use ($tag) {
 			$tag->cursor = $cursor;
 				foreach ($cursor->items as $k => &$item) {
@@ -174,11 +175,10 @@ class ChatTag {
 	}
 	public function touch() {
 		if (!$this->cursor) {
-			$tag = $this;
-			
+			$this->createCursor();
 		}
-			elseif (!$this->cursor->conn->busy) {
-				try {
+		elseif (!$this->cursor->conn->busy) {
+			try {
 					$this->cursor->getMore();
 				}
 				catch (MongoClientSessionFinished $e) {
