@@ -18,7 +18,7 @@ class Chat extends AppInstance {
 	public function init() {
 		if ($this->config->enable->value) {
 			Daemon::log(__CLASS__.' up.');
-			$this->db = MongoClient::getInstance();
+			$this->db = MongoClientAsync::getInstance();
 			$this->tags = array();
 			$this->minMsgInterval = 1;
 		}
