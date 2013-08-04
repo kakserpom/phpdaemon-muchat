@@ -1,24 +1,29 @@
 <?php
+namespace PHPDaemon\Applications;
+use PHPDaemon\Core\Daemon;
+use PHPDaemon\Core\Debug;
+
 	/*
 DRAFT:
  db.chatsessions.ensureIndex({id:1},{unique: true});
  db.createCollection("chatevents", {capped:true, size:100000})
 */
-class Chat extends AppInstance {
-	public $sessions = array();
+class Chat extends \PHPDaemon\Core\AppInstance {
+	public $sessions = [];
 	public $dbname;
 	public $db;
 	public $tags;
 	public $minMsgInterval;
 	public $sessCounter = 0;
+	public $timer;
 	protected function getConfigDefaults() {
-		return array('dbname' => 'chat','adminpassword' => '','enable' => 0);
+		return ['dbname' => 'chat','adminpassword' => '','enable' => 0];
 	}
 
 	public function init() {
 		if ($this->config->enable->value) {
 			Daemon::log(__CLASS__.' up.');
-			$this->db = MongoClientAsync::getInstance();
+			$this->db = \PHPDaemon\Clients\Mongo\Pool::getInstance();
 			$this->tags = array();
 			$this->minMsgInterval = 1;
 		}
@@ -89,7 +94,7 @@ class Chat extends AppInstance {
 	}
 	public function onReady() {
 		if ($this->isEnabled()) {
-			WebSocketServer::getInstance()->addRoute('Chat', array($this,'onHandshake'));
+			\PHPDaemon\Servers\WebSocket\Pool::getInstance()->addRoute('Chat', array($this,'onHandshake'));
 			$app = $this;
 			$this->timer = setTimeout(function($timer) use ($app) {
 				foreach ($app->tags as $tag) {
@@ -120,7 +125,7 @@ class ChatTag {
 		$tag = $this;
 		$this->appInstance->db->{$this->appInstance->config->dbname->value . '.chatevents'}->find(function($cursor) use ($tag) {
 			$tag->cursor = $cursor;
-				foreach ($cursor->items as $k => &$item) {
+				foreach ($cursor->items as $k => $item) {
 					if ($item['type'] === 'kickUsers') {
 						foreach ($tag->sessions as $id => $v) {
 							$sess = $tag->appInstance->sessions[$id];
@@ -177,53 +182,46 @@ class ChatTag {
 		if (!$this->cursor) {
 			$this->createCursor();
 		}
-		elseif (!$this->cursor->conn->busy) {
+		elseif (!$this->cursor->getConn()->isBusy()) {
 			try {
-					$this->cursor->getMore();
-				}
-				catch (MongoClientConnectionFinished $e) {
-					$this->cursor = false;
-				}
+				$this->cursor->getMore();
+			}
+			catch (MongoClientConnectionFinished $e) {
+				$this->cursor = false;
 			}
 		}
 	}
-	class ChatSession extends WebSocketRoute{
-		public $client;
-		public $username;
-		public $tags = array();
-		public $sid;
-		public $lastMsgTS;
-		public $su = FALSE;
-		public $lastMsgIDs = array();
-		public $statusmsg;
-		public function __construct($client,$appInstance) {
-			$this->client = $client;
-			$this->lastMsgIDs = new SplStack();
-			$this->appInstance = $appInstance;
-			$this->sid = new MongoId();
-			$this->updateSession(array(    'atime' => microtime(TRUE),    'ltime' => microtime(TRUE),  ));
-		}
-
-		public function gracefulShutdown() {
-			return TRUE;
-		}
-
-		public function putMsgId($s) {
-			for ($i = 0, $c = count($this->lastMsgIDs); $i < $c; ++$i)  {
-				
-				if ($this->lastMsgIDs[$i] === $s) {
-					return FALSE;
-				}
-
+}
+class ChatSession extends \PHPDaemon\WebSocket\Route{
+	public $client;
+	public $username;
+	public $tags = array();
+	public $sid;
+	public $lastMsgTS;
+	public $su = FALSE;
+	public $lastMsgIDs = [];
+	public $statusmsg;
+	public function __construct($client,$appInstance) {
+		$this->client = $client;
+		$this->lastMsgIDs = new \SplStack();
+		$this->appInstance = $appInstance;
+		$this->sid = new \MongoId();
+		$this->updateSession(['atime' => microtime(TRUE), 'ltime' => microtime(TRUE)]);
+	}
+	public function gracefulShutdown() {
+		return TRUE;
+	}
+	public function putMsgId($s) {
+		for ($i = 0, $c = count($this->lastMsgIDs); $i < $c; ++$i)  {
+			if ($this->lastMsgIDs[$i] === $s) {
+				return FALSE;
 			}
-
-			$this->lastMsgIDs[] = $s;
-			
-			if ($c >= 4) {
-				$this->lastMsgIDs->shift();
-			}
-
-			return TRUE;
+		}
+		$this->lastMsgIDs[] = $s;
+		if ($c >= 4) {
+			$this->lastMsgIDs->shift();
+		}
+		return true;
 		}
 
 		public function onFinish() {
